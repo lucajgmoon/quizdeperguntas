@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/p5.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.6.0/addons/p5.sound.min.js"></script>
+    <title>Quiz Completo</title>
+  </head>
+
+  <body>
+    <script>
+      let tela = "menu";
+      let fundo;
+
+      let fase = 1;
+      let acertos = 0;
+
+      let pergunta = "";
+      let respostaCorreta = 0;
+      let input, botaoResponder;
+      let resultado = "";
+
+      let recompensaDesbloqueada = 0;
+
+      let oscMenu, oscAcerto, oscErro;
+
+      function carregarProgresso() {
+        let dados = localStorage.getItem("progressoQuiz");
+        if (dados) {
+          dados = JSON.parse(dados);
+          fase = dados.fase;
+          acertos = dados.acertos;
+          recompensaDesbloqueada = dados.recompensa;
+        }
+      }
+
+      function salvarProgresso() {
+        localStorage.setItem(
+          "progressoQuiz",
+          JSON.stringify({
+            fase: fase,
+            acertos: acertos,
+            recompensa: recompensaDesbloqueada,
+          })
+        );
+      }
+
+      function preload() {
+        fundo = loadImage("fundo.jpg");
+      }
+
+      function setup() {
+        createCanvas(windowWidth, windowHeight);
+
+        carregarProgresso();
+
+        input = createInput("");
+        input.position(width / 2 - 80, height / 2);
+        input.hide();
+
+        botaoResponder = createButton("Responder");
+        botaoResponder.position(width / 2 - 40, height / 2 + 40);
+        botaoResponder.mousePressed(verificar);
+        botaoResponder.hide();
+
+        oscMenu = new p5.Oscillator("sine");
+        oscMenu.freq(220);
+        oscMenu.amp(0.05);
+        oscMenu.start();
+
+        oscAcerto = new p5.Oscillator("square");
+        oscAcerto.amp(0);
+        oscAcerto.start();
+
+        oscErro = new p5.Oscillator("triangle");
+        oscErro.amp(0);
+        oscErro.start();
+      }
+
+      function tocarAcerto() {
+        oscAcerto.freq(600);
+        oscAcerto.amp(0.4, 0.05);
+        setTimeout(() => oscAcerto.amp(0, 0.2), 150);
+      }
+
+      function tocarErro() {
+        oscErro.freq(120);
+        oscErro.amp(0.4, 0.05);
+        setTimeout(() => oscErro.amp(0, 0.3), 200);
+      }
+
+      function draw() {
+        background(fundo);
+
+        if (tela === "menu") mostrarMenu();
+        else if (tela === "quiz") mostrarQuiz();
+        else if (tela === "creditos") mostrarCreditos();
+        else if (tela === "recompensas") mostrarRecompensas();
+      }
+
+      function textoContour(txt, x, y, size = 40) {
+        textSize(size);
+        stroke(0);
+        strokeWeight(6);
+        fill(255);
+        text(txt, x, y);
+      }
+
+      function mostrarMenu() {
+        textAlign(CENTER);
+        textoContour("Quiz de Operações", width / 2, 130, 50);
+        textoContour(`Fase atual: ${fase}`, width / 2, 190, 40);
+        textoContour(`Acertos: ${acertos}`, width / 2, 240, 35);
+
+        desenharBotao(width / 2 - 100, 300, 200, 60, "Iniciar", iniciarQuiz);
+        desenharBotao(
+          width / 2 - 100,
+          400,
+          200,
+          60,
+          "Recompensas",
+          () => (tela = "recompensas")
+        );
+        desenharBotao(
+          width / 2 - 100,
+          500,
+          200,
+          60,
+          "Créditos",
+          () => (tela = "creditos")
+        );
+      }
+
+      function desenharBotao(x, y, w, h, txt, acao) {
+        if (mouseX > x && mouseX < x + w && mouseY > y && mouseY < y + h) {
+          fill(255, 230, 150);
+          if (mouseIsPressed) acao();
+        } else fill(255);
+
+        rect(x, y, w, h, 15);
+        fill(0);
+        noStroke();
+        textSize(26);
+        textAlign(CENTER, CENTER);
+        text(txt, x + w / 2, y + h / 2);
+      }
+
+      function mostrarCreditos() {
+        textAlign(CENTER);
+        textoContour("Créditos", width / 2, 120, 50);
+        textoContour("Criado por Abner Lucas", width / 2, height / 2 - 80, 34);
+        textoContour("Curso: Lógica de Programação", width / 2, height / 2 - 30, 30);
+        textoContour("Professores: Aquiles e Jadson", width / 2, height / 2 + 20, 30);
+
+        desenharBotao(width / 2 - 80, height - 120, 160, 50, "Voltar", () => {
+          tela = "menu";
+        });
+      }
+
+      function mostrarRecompensas() {
+        textAlign(CENTER);
+        textoContour("Recompensas", width / 2, 120, 50);
+
+        if (recompensaDesbloqueada === 0)
+          textoContour("Nenhuma desbloqueada", width / 2, height / 2, 35);
+        if (recompensaDesbloqueada >= 5)
+          textoContour("5% de desconto — Fase 1", width / 2, height / 2 - 40, 30);
+        if (recompensaDesbloqueada >= 10)
+          textoContour("10% de desconto — Fase 2", width / 2, height / 2, 30);
+        if (recompensaDesbloqueada >= 15)
+          textoContour("15% de desconto — Fase 3", width / 2, height / 2 + 40, 30);
+
+        desenharBotao(width / 2 - 80, height - 120, 160, 50, "Voltar", () => {
+          tela = "menu";
+        });
+      }
+
+      function iniciarQuiz() {
+        tela = "quiz";
+        gerarPergunta();
+        input.show();
+        botaoResponder.show();
+        resultado = "";
+      }
+
+      function mostrarQuiz() {
+        textAlign(CENTER);
+        textoContour(`Fase ${fase}`, width / 2, 80, 40);
+        textoContour(pergunta, width / 2, height / 2 - 100, 40);
+        textoContour(resultado, width / 2, height / 2 + 150, 35);
+        desenharBotao(20, 20, 120, 40, "Voltar", voltarMenu);
+      }
+
+      function voltarMenu() {
+        tela = "menu";
+        input.hide();
+        botaoResponder.hide();
+      }
+
+      function gerarPergunta() {
+        let a, b, op;
+
+        if (fase === 1) {
+          a = int(random(1, 10));
+          b = int(random(1, 10));
+          op = random(["+", "x"]);
+        } else if (fase === 2) {
+          a = int(random(5, 20));
+          b = int(random(5, 20));
+          op = random(["-", "÷", "x"]);
+        } else if (fase === 3) {
+          a = int(random(10, 50));
+          b = int(random(1, 30));
+          op = random(["+", "-", "x", "÷"]);
+        }
+
+        if (op === "+") respostaCorreta = a + b;
+        if (op === "-") respostaCorreta = a - b;
+        if (op === "x") respostaCorreta = a * b;
+
+        if (op === "÷") {
+          respostaCorreta = a;
+          b = int(random(1, 10));
+          a = respostaCorreta * b;
+        }
+
+        pergunta = `Quanto é ${a} ${op} ${b}?`;
+      }
+
+      function verificar() {
+        let valor = Number(input.value());
+
+        if (valor === respostaCorreta) {
+          resultado = "Correto!";
+          acertos++;
+          tocarAcerto();
+
+          if (fase === 1 && acertos >= 30) {
+            fase = 2;
+            recompensaDesbloqueada = Math.max(recompensaDesbloqueada, 5);
+          }
+
+          if (fase === 2 && acertos >= 60) {
+            fase = 3;
+            recompensaDesbloqueada = Math.max(recompensaDesbloqueada, 10);
+          }
+
+          if (fase === 3 && acertos >= 100) {
+            recompensaDesbloqueada = Math.max(recompensaDesbloqueada, 15);
+          }
+
+          salvarProgresso();
+          gerarPergunta();
+        } else {
+          resultado = "Errado!";
+          tocarErro();
+        }
+
+        input.value("");
+      }
+    </script>
+  </body>
+</html>
